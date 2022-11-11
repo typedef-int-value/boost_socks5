@@ -42,10 +42,10 @@ inline void write_log(int prefix, short verbose, short verbose_level, int sessio
 class Session : public std::enable_shared_from_this<Session>
 {
 public:
-	Session(tcp::socket in_socket, unsigned session_id, size_t buffer_size, short verbose)
+	Session(boost::asio::io_service& io_service, tcp::socket in_socket, unsigned session_id, size_t buffer_size, short verbose)
 		:	in_socket_(std::move(in_socket)), 
-			out_socket_(in_socket.get_io_service()), 
-			resolver(in_socket.get_io_service()),
+			out_socket_(io_service),
+			resolver(io_service),
 			in_buf_(buffer_size), 
 			out_buf_(buffer_size), 
 			session_id_(session_id),
@@ -400,7 +400,7 @@ class Server
 {
 public:
 	Server(boost::asio::io_service& io_service, short port, unsigned buffer_size, short verbose)
-		: acceptor_(io_service, tcp::endpoint(tcp::v4(), port)), 
+		: io_service_(io_service), acceptor_(io_service, tcp::endpoint(tcp::v4(), port)),
 		in_socket_(io_service), buffer_size_(buffer_size), verbose_(verbose), session_id_(0)
 	{
 		do_accept();
@@ -414,7 +414,7 @@ private:
 			{
 				if (!ec)
 				{
-					std::make_shared<Session>(std::move(in_socket_), session_id_++, buffer_size_, verbose_)->start();
+					std::make_shared<Session>(io_service_, std::move(in_socket_), session_id_++, buffer_size_, verbose_)->start();
 				}
 				else
 					write_log(1, 0, verbose_, session_id_, "socket accept error", ec.message());
@@ -428,6 +428,7 @@ private:
 	size_t buffer_size_;
 	short verbose_;
 	unsigned session_id_;
+  boost::asio::io_service &io_service_;
 };
 
 int main(int argc, char* argv[])
